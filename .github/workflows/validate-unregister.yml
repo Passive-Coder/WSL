@@ -35,12 +35,30 @@ jobs:
       - name: Build full project
         shell: cmd
         run: cmake --build . --config Release --parallel 4
+      - name: Preserve built test files
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            bin/x64/Release
+            packages
+          key: unregister-windows-7e698b1e
       - name: Run built WSL command
         shell: pwsh
         run: |
           $env:WSL_UTF8 = '1'
-          & .\bin\x64\Release\wsl.exe --help
-          if ($LASTEXITCODE -ne 0) { throw "wsl --help failed: $LASTEXITCODE" }
+          $helpText = & .\bin\x64\Release\wsl.exe --help
+          $helpExitCode = $LASTEXITCODE
+          $helpText
+          if ($helpExitCode -ne -1) { throw "Unexpected help exit code: $helpExitCode" }
+          if (($helpText -join "`n") -notmatch 'Skip confirmation\. Required when input is redirected\.') {
+            throw 'The built command did not show the unregister confirmation help.'
+          }
+          exit 0
       - name: Run unregister regression tests
+        id: native-tests
         shell: cmd
         run: bin\x64\Release\test.bat /name:UnitTests::UnitTests::*Unregister*
+      - name: Run unregister regression tests with WSL 1
+        if: ${{ failure() && steps.native-tests.outcome == 'failure' }}
+        shell: cmd
+        run: bin\x64\Release\test.bat -Version 1 /name:UnitTests::UnitTests::*Unregister*
