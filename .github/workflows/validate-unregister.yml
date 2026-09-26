@@ -10,6 +10,11 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fetch upstream release tags
+        shell: pwsh
+        run: git fetch https://github.com/microsoft/WSL.git master --tags
       - name: Install required Visual Studio components
         shell: pwsh
         run: |
