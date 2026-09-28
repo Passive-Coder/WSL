@@ -41,7 +41,7 @@ jobs:
           path: |
             bin/x64/Release
             packages
-          key: unregister-windows-7e698b1e
+          key: unregister-windows-8c9dcf6e
       - name: Run built WSL command
         shell: pwsh
         run: |
@@ -50,8 +50,11 @@ jobs:
           $helpExitCode = $LASTEXITCODE
           $helpText
           if ($helpExitCode -ne -1) { throw "Unexpected help exit code: $helpExitCode" }
-          if (($helpText -join "`n") -notmatch 'Skip confirmation\. Required when input is redirected\.') {
-            throw 'The built command did not show the unregister confirmation help.'
+          if (($helpText -join "`n") -notmatch 'after a 10-second warning\.') {
+            throw 'The built command did not show the unregister warning delay.'
+          }
+          if (($helpText -join "`n") -notmatch 'Skip the warning and delay\.') {
+            throw 'The built command did not show the updated force option.'
           }
           exit 0
       - name: Run unregister regression tests
@@ -62,3 +65,6 @@ jobs:
         if: ${{ failure() && steps.native-tests.outcome == 'failure' }}
         shell: cmd
         run: bin\x64\Release\test.bat -Version 1 /name:UnitTests::UnitTests::*Unregister*
+      - name: Run CLI help regression test
+        shell: cmd
+        run: bin\x64\Release\test.bat -Fast /name:UnitTests::UnitTests::UsageMessages
