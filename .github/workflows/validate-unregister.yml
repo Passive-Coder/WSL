@@ -1,7 +1,7 @@
 name: Validate unregister recovery on Windows
 on:
   push:
-    branches: [fix/validate-unregister-windows]
+    branches: [fix/validate-unregister-recovery]
 permissions:
   contents: read
 jobs:
@@ -41,7 +41,7 @@ jobs:
           path: |
             bin/x64/Release
             packages
-          key: unregister-windows-8c9dcf6e
+          key: unregister-recovery-af560a35
       - name: Run built WSL command
         shell: pwsh
         run: |
@@ -59,7 +59,6 @@ jobs:
         shell: cmd
         run: bin\x64\Release\test.bat /name:UnitTests::UnitTests::*Unregister*
       - name: Run unregister regression tests with WSL 1
-        if: ${{ failure() && steps.native-tests.outcome == 'failure' }}
         shell: cmd
         run: bin\x64\Release\test.bat -Version 1 /name:UnitTests::UnitTests::*Unregister*
       - name: Run CLI help regression test
