@@ -41,7 +41,7 @@ jobs:
           path: |
             bin/x64/Release
             packages
-          key: unregister-recovery-af560a35
+          key: unregister-recovery-hardened
       - name: Run built WSL command
         shell: pwsh
         run: |
