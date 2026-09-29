@@ -41,7 +41,7 @@ jobs:
           path: |
             bin/x64/Release
             packages
-          key: unregister-recovery-hardened
+          key: unregister-recovery-offline
       - name: Run built WSL command
         shell: pwsh
         run: |
@@ -66,4 +66,4 @@ jobs:
         run: bin\x64\Release\test.bat -Fast /name:UnitTests::UnitTests::UsageMessages
       - name: Run import and registration compatibility tests
         shell: cmd
-        run: bin\x64\Release\test.bat -Fast /name:UnitTests::UnitTests::ImportDistro
+        run: bin\x64\Release\test.bat /name:UnitTests::UnitTests::ImportDistro
