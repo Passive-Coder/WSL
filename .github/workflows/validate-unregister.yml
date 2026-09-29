@@ -22,13 +22,13 @@ jobs:
         run: New-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock' -Name AllowDevelopmentWithoutDevLicense -Value 1 -PropertyType DWord -Force
       - name: Set up WSL 2 with visible output
         shell: powershell
-        run: tools/test/test-setup.ps1 -Version 2 -DistroPath packages/Microsoft.WSL.TestDistro.2.7.1-1/x64/test_distro.tar.xz -DistroName test_distro -Package bin/x64/Release/installer.msix -UnitTestsPath test/linux/unit_tests -AllowUnsigned
+        run: tools/test/test-setup.ps1 -Version 2 -DistroPath packages/Microsoft.WSL.TestDistro.2.7.1-1/x64/test_distro.tar.xz -DistroName test_distro -Package bin/x64/Release/installer.msix -UnitTestsPath "$pwd/test/linux/unit_tests" -AllowUnsigned
       - name: Run WSL 2 regressions
         shell: cmd
         run: bin\x64\Release\test.bat -Fast /name:UnitTests::UnitTests::*Unregister*
       - name: Set up WSL 1 with visible output
         shell: powershell
-        run: tools/test/test-setup.ps1 -Version 1 -DistroPath packages/Microsoft.WSL.TestDistro.2.7.1-1/x64/test_distro.tar.xz -DistroName test_distro -Package bin/x64/Release/installer.msix -UnitTestsPath test/linux/unit_tests -AllowUnsigned
+        run: tools/test/test-setup.ps1 -Version 1 -DistroPath packages/Microsoft.WSL.TestDistro.2.7.1-1/x64/test_distro.tar.xz -DistroName test_distro -Package bin/x64/Release/installer.msix -UnitTestsPath "$pwd/test/linux/unit_tests" -AllowUnsigned
       - name: Run WSL 1 regressions
         shell: cmd
         run: bin\x64\Release\test.bat -Fast -Version 1 /name:UnitTests::UnitTests::*Unregister*
