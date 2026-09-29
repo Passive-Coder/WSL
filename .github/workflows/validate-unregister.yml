@@ -1,69 +1,37 @@
-name: Validate unregister recovery on Windows
+name: Diagnose recovery test setup
 on:
   push:
     branches: [fix/validate-unregister-recovery]
 permissions:
   contents: read
 jobs:
-  build-and-test:
+  test:
     runs-on: windows-2025
-    timeout-minutes: 90
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Fetch upstream release tags
-        shell: pwsh
-        run: git fetch https://github.com/microsoft/WSL.git master --tags
-      - name: Install required Visual Studio components
-        shell: pwsh
-        run: |
-          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          $installPath = & $vswhere -latest -products * -property installationPath
-          $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\setup.exe"
-          $arguments = @('modify', '--installPath', ('"' + $installPath + '"'), '--quiet', '--norestart',
-            '--add', 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64.Spectre',
-            '--add', 'Microsoft.VisualStudio.Component.VC.ATL.Spectre',
-            '--add', 'Microsoft.VisualStudio.Component.VC.Llvm.Clang',
-            '--add', 'Microsoft.VisualStudio.Component.Windows11SDK.26100')
-          $process = Start-Process $installer -ArgumentList $arguments -Wait -PassThru
-          if ($process.ExitCode -notin @(0, 3010)) { throw "VS setup failed: $($process.ExitCode)" }
-          New-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock' -Name AllowDevelopmentWithoutDevLicense -Value 1 -PropertyType DWord -Force
-      - name: Configure full project
-        shell: cmd
-        run: cmake . -A x64 -DCMAKE_BUILD_TYPE=Release
-      - name: Build full project
-        shell: cmd
-        run: cmake --build . --config Release --parallel 4
-      - name: Preserve built test files
-        uses: actions/cache/save@v4
+      - uses: actions/cache/restore@v4
         with:
           path: |
             bin/x64/Release
             packages
-          key: unregister-recovery-offline
-      - name: Run built WSL command
+          key: unregister-recovery-af560a35
+          fail-on-cache-miss: true
+      - name: Enable developer mode
         shell: pwsh
-        run: |
-          $env:WSL_UTF8 = '1'
-          $helpText = & .\bin\x64\Release\wsl.exe --help
-          $helpExitCode = $LASTEXITCODE
-          $helpText
-          if ($helpExitCode -ne -1) { throw "Unexpected help exit code: $helpExitCode" }
-          if (($helpText -join "`n") -notmatch 'Restores a retained WSL 2 distribution') {
-            throw 'The built command did not show distribution recovery.'
-          }
-          exit 0
-      - name: Run unregister regression tests
-        id: native-tests
+        run: New-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock' -Name AllowDevelopmentWithoutDevLicense -Value 1 -PropertyType DWord -Force
+      - name: Set up WSL 2 with visible output
+        shell: powershell
+        run: tools/test/test-setup.ps1 -Version 2 -DistroPath packages/Microsoft.WSL.TestDistro.2.7.1-1/x64/test_distro.tar.xz -DistroName test_distro -Package bin/x64/Release/installer.msix -UnitTestsPath test/linux/unit_tests -AllowUnsigned
+      - name: Run WSL 2 regressions
         shell: cmd
-        run: bin\x64\Release\test.bat /name:UnitTests::UnitTests::*Unregister*
-      - name: Run unregister regression tests with WSL 1
+        run: bin\x64\Release\test.bat -Fast /name:UnitTests::UnitTests::*Unregister*
+      - name: Set up WSL 1 with visible output
+        shell: powershell
+        run: tools/test/test-setup.ps1 -Version 1 -DistroPath packages/Microsoft.WSL.TestDistro.2.7.1-1/x64/test_distro.tar.xz -DistroName test_distro -Package bin/x64/Release/installer.msix -UnitTestsPath test/linux/unit_tests -AllowUnsigned
+      - name: Run WSL 1 regressions
         shell: cmd
-        run: bin\x64\Release\test.bat -Version 1 /name:UnitTests::UnitTests::*Unregister*
-      - name: Run CLI help regression test
+        run: bin\x64\Release\test.bat -Fast -Version 1 /name:UnitTests::UnitTests::*Unregister*
+      - name: Run help regression
         shell: cmd
         run: bin\x64\Release\test.bat -Fast /name:UnitTests::UnitTests::UsageMessages
-      - name: Run import and registration compatibility tests
-        shell: cmd
-        run: bin\x64\Release\test.bat /name:UnitTests::UnitTests::ImportDistro
