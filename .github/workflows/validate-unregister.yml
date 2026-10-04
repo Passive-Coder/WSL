@@ -41,7 +41,7 @@ jobs:
           path: |
             bin/x64/Release
             packages
-          key: unregister-recovery-journal-0013faca
+          key: unregister-recovery-journal-f006059b
       - name: Run built WSL command
         shell: pwsh
         run: |
