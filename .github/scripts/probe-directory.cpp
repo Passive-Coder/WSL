@@ -1,6 +1,7 @@
 #include <windows.h>
 #include <filesystem>
 #include <iostream>
+#include <string>
 #include <vector>
 
 int main()
@@ -8,7 +9,7 @@ int main()
     const auto root = std::filesystem::temp_directory_path() / L"wsl-directory-sharing-probe";
     std::filesystem::create_directory(root);
     int failures = 0;
-    for (DWORD access : {DWORD(FILE_READ_ATTRIBUTES), DWORD(DELETE | FILE_READ_ATTRIBUTES)})
+    for (DWORD access : {DWORD(FILE_READ_ATTRIBUTES), DWORD(DELETE | FILE_READ_ATTRIBUTES), DWORD(FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES)})
     {
         for (DWORD sharing : {DWORD(FILE_SHARE_READ), DWORD(FILE_SHARE_READ | FILE_SHARE_WRITE)})
         {
@@ -19,6 +20,9 @@ int main()
             HANDLE directory = CreateFileW(dir.c_str(), access, sharing, nullptr, OPEN_EXISTING,
                                            FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
             if (file == INVALID_HANDLE_VALUE || directory == INVALID_HANDLE_VALUE) return 2;
+            const auto movedDir = root / L"moved-directory";
+            const bool replaced = MoveFileW(dir.c_str(), movedDir.c_str());
+            if (replaced && !MoveFileW(movedDir.c_str(), dir.c_str())) return 3;
             const auto target = (dir / L"disk.vhdx").wstring();
             std::vector<BYTE> buffer(sizeof(FILE_RENAME_INFO) + target.size() * sizeof(wchar_t));
             auto info = reinterpret_cast<FILE_RENAME_INFO*>(buffer.data());
@@ -26,7 +30,7 @@ int main()
             memcpy(info->FileName, target.data(), info->FileNameLength);
             const bool renamed = SetFileInformationByHandle(file, FileRenameInfo, info, static_cast<DWORD>(buffer.size()));
             const auto error = renamed ? ERROR_SUCCESS : GetLastError();
-            std::cout << "access=" << access << " sharing=" << sharing << " renamed=" << renamed << " error=" << error << std::endl;
+            std::cout << "access=" << access << " sharing=" << sharing << " directory-movable=" << replaced << " renamed=" << renamed << " error=" << error << std::endl;
             if (access == FILE_READ_ATTRIBUTES && sharing == (FILE_SHARE_READ | FILE_SHARE_WRITE) && !renamed) ++failures;
             CloseHandle(file);
             CloseHandle(directory);
