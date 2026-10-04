@@ -23,46 +23,9 @@ jobs:
       - name: Enable unsigned test package installation
         shell: pwsh
         run: New-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock' -Name AllowDevelopmentWithoutDevLicense -Value 1 -PropertyType DWord -Force
-      - name: Run built WSL command
+      - name: Install previously built WSL
         shell: pwsh
-        run: |
-          $env:WSL_UTF8 = '1'
-          $helpText = & .\bin\x64\Release\wsl.exe --help
-          $helpExitCode = $LASTEXITCODE
-          $helpText
-          if ($helpExitCode -ne -1) { throw "Unexpected help exit code: $helpExitCode" }
-          if (($helpText -join "`n") -notmatch 'Restores a retained WSL 2 distribution') {
-            throw 'The built command did not show distribution recovery.'
-          }
-          exit 0
-      - name: Run recovery store regression tests
-        timeout-minutes: 6
-        shell: cmd
-        run: bin\x64\Release\test.bat /name:UnitTests::UnitTests::UnregisterRecoveryStore
-      - name: Run recovery lifecycle regression tests
-        timeout-minutes: 6
-        shell: cmd
-        run: bin\x64\Release\test.bat -Fast /name:UnitTests::UnitTests::UnregisterRecoveryLifecycle
-      - name: Run unregister compatibility regression tests
-        timeout-minutes: 6
-        shell: cmd
-        run: bin\x64\Release\test.bat -Fast /name:UnitTests::UnitTests::UnregisterCompatibility
-      - name: Run broken-distro unregister regression tests
-        timeout-minutes: 6
-        shell: cmd
-        run: bin\x64\Release\test.bat -Fast /name:UnitTests::UnitTests::BrokenDistroUnregister
-      - name: Recheck the original Copilot reproductions
+        run: .\tools\test\test-setup.ps1 -Version 2 -Package .\bin\x64\Release\installer.msix -AllowUnsigned
+      - name: Reproduce latest review findings
         shell: pwsh
-        run: .\.github\scripts\reproduce-unregister.ps1
-      - name: Recheck restore journal and directory identity findings
-        shell: pwsh
-        run: .\.github\scripts\reproduce-recovery.ps1
-      - name: Run unregister regression tests with WSL 1
-        shell: cmd
-        run: bin\x64\Release\test.bat -Version 1 /name:UnitTests::UnitTests::*Unregister*
-      - name: Run CLI help regression test
-        shell: cmd
-        run: bin\x64\Release\test.bat -Fast /name:UnitTests::UnitTests::UsageMessages
-      - name: Run import and registration compatibility tests
-        shell: cmd
-        run: bin\x64\Release\test.bat /name:UnitTests::UnitTests::ImportDistro
+        run: .\.github\scripts\reproduce-followup.ps1
