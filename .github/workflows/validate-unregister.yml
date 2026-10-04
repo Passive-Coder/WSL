@@ -41,7 +41,7 @@ jobs:
           path: |
             bin/x64/Release
             packages
-          key: unregister-recovery-followup-55acdabd
+          key: unregister-recovery-followup-8dc33695
       - name: Run built WSL command
         shell: pwsh
         run: |
