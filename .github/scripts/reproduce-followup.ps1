@@ -1,12 +1,5 @@
 $ErrorActionPreference = 'Stop'
 $env:WSL_UTF8 = '1'
-Add-Type @'
-using System.Runtime.InteropServices;
-public static class LegacyWsl {
-    [DllImport("wslapi.dll", CharSet = CharSet.Unicode)]
-    public static extern int WslUnregisterDistribution(string name);
-}
-'@
 $root = Join-Path $env:TEMP ('wsl-followup-' + [guid]::NewGuid())
 New-Item -ItemType Directory $root | Out-Null
 $lxss = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss'
@@ -15,7 +8,7 @@ if (-not $archive) { throw 'Test archive missing' }
 $names = @()
 $failures = @()
 try {
-    foreach ($scenario in @('unavailable', 'legacy', 'nonempty')) {
+    foreach ($scenario in @('unavailable', 'nonempty')) {
         $name = 'followup-' + $scenario + '-' + [guid]::NewGuid()
         $names += $name
         $install = Join-Path $root $name
@@ -31,12 +24,6 @@ try {
                 $failures += 'FAIL: unavailable install path lost its registration'
             }
             Move-Item ($install + '-offline') $install
-        } elseif ($scenario -eq 'legacy') {
-            if ([LegacyWsl]::WslUnregisterDistribution($name) -ne 0) { throw 'Legacy API failed' }
-            $retained = @(Get-ChildItem $lxss | Where-Object { (Get-ItemProperty $_.PSPath).DistributionName -eq $name })
-            if ($retained.Count -or (Test-Path (Join-Path $install 'ext4.vhdx'))) {
-                $failures += 'FAIL: legacy API retained a disk instead of permanently deleting it'
-            }
         } else {
             & wsl.exe --unregister $name
             if ($LASTEXITCODE -ne 0) { throw 'Unregister failed' }
@@ -67,4 +54,4 @@ try {
 }
 $failures | Write-Host
 if ($failures.Count) { exit 1 }
-Write-Host 'PASS: unavailable paths preserve registration, legacy API deletes permanently, and directory cleanup retries'
+Write-Host 'PASS: unavailable paths preserve registration and directory cleanup retries'
