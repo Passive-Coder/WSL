@@ -5,6 +5,7 @@ New-Item -ItemType Directory $root | Out-Null
 $lxss = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss'
 $archive = (Get-ChildItem packages -Recurse -Filter test_distro.tar.xz | Where-Object FullName -Match '\\x64\\' | Select-Object -First 1).FullName
 if (-not $archive) { throw 'Test archive missing' }
+$defaultBefore = (Get-ItemProperty $lxss).DefaultDistribution
 $names = @()
 $failures = @()
 try {
@@ -21,6 +22,7 @@ try {
         $parent = Split-Path $disk
         if ($scenario -eq 'restore') {
             # Durable restore journal just before the Deleted-{id} key rename.
+            Remove-ItemProperty $lxss -Name DefaultDistribution -ErrorAction SilentlyContinue
             Set-ItemProperty $entry.PSPath -Name BasePath -Value $parent
             New-ItemProperty $entry.PSPath -Name RecoveryRestored -PropertyType DWord -Value 1 -Force | Out-Null
             $active = Join-Path $lxss $entry.PSChildName.Substring(8)
@@ -33,6 +35,7 @@ try {
         & wsl.exe --list --deleted
         if ($LASTEXITCODE -ne 0) { throw 'Recovery/cleanup failed' }
         if ($scenario -eq 'restore') {
+            if ((Get-ItemProperty $lxss).DefaultDistribution -ne $entry.PSChildName.Substring(8)) { $failures += 'FAIL: pending restore did not restore default distribution selection' }
             if (-not (Test-Path $active)) { $failures += 'FAIL: pending restore was not committed to its active registration' }
             if (-not (Test-Path -LiteralPath $disk)) { $failures += 'FAIL: expired cleanup deleted the pending restore disk' }
         } else {
@@ -48,6 +51,9 @@ finally {
             if ($entry.PSChildName -like 'Deleted-*') { Remove-Item $entry.PSPath -Recurse -Force }
             else { & wsl.exe --unregister (Get-ItemProperty $entry.PSPath).DistributionName --force }
         }
+    }
+    if ($defaultBefore -and (Test-Path (Join-Path $lxss $defaultBefore))) {
+        New-ItemProperty $lxss -Name DefaultDistribution -Value $defaultBefore -PropertyType String -Force | Out-Null
     }
     Remove-Item $root -Recurse -Force
 }
