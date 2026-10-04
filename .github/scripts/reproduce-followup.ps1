@@ -23,6 +23,8 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Import failed' }
         $registration = Get-ChildItem $lxss | Where-Object { (Get-ItemProperty $_.PSPath).DistributionName -eq $name }
         if ($scenario -eq 'unavailable') {
+            & wsl.exe --shutdown
+            if ($LASTEXITCODE -ne 0) { throw 'Shutdown failed' }
             Move-Item $install ($install + '-offline')
             & wsl.exe --unregister $name
             if ($LASTEXITCODE -eq 0 -or -not (Test-Path $registration.PSPath)) {
