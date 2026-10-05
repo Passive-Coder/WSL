@@ -32,8 +32,8 @@ jobs:
       - name: Record tested PR source
         shell: pwsh
         run: |
-          Write-Host 'Testing PR revision d6d23fd78d3ea18138adac2883a0f99493bcde69'
-          'd6d23fd78d3ea18138adac2883a0f99493bcde69' | Set-Content tested-revision.txt
+          Write-Host 'Testing PR revision bf001933316925a472de0525800d683b68780573'
+          'bf001933316925a472de0525800d683b68780573' | Set-Content tested-revision.txt
       - name: Configure full project
         shell: cmd
         run: cmake . -A x64 -DCMAKE_BUILD_TYPE=Release
@@ -110,3 +110,11 @@ jobs:
       - name: Run import and registration compatibility tests
         shell: cmd
         run: bin\x64\Release\test.bat /name:UnitTests::UnitTests::ImportDistro
+      - name: Run plugin registration and cleanup compatibility tests
+        timeout-minutes: 6
+        shell: cmd
+        run: bin\x64\Release\test.bat -Fast /name:PluginTests::PluginTests::*Register*
+      - name: Run plugin import-in-place cleanup compatibility test
+        timeout-minutes: 6
+        shell: cmd
+        run: bin\x64\Release\test.bat -Fast /name:PluginTests::PluginTests::ImportInplaceSuccess
