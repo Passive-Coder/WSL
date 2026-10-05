@@ -32,8 +32,8 @@ jobs:
       - name: Record tested PR source
         shell: pwsh
         run: |
-          Write-Host 'Testing PR revision ab5f5337d8357b2cac841b60c0656e1d538ae251'
-          'ab5f5337d8357b2cac841b60c0656e1d538ae251' | Set-Content tested-revision.txt
+          Write-Host 'Testing PR revision bb82d8ea45bbdd1c5cefc3b61c17279fb7980869'
+          'bb82d8ea45bbdd1c5cefc3b61c17279fb7980869' | Set-Content tested-revision.txt
       - name: Compile recovery header without a precompiled header
         shell: pwsh
         run: |
