@@ -32,8 +32,8 @@ jobs:
       - name: Record tested PR source
         shell: pwsh
         run: |
-          Write-Host 'Testing PR revision 2becb96ffd4bdf6daea02904c86e0cc5e6c9f8f7'
-          '2becb96ffd4bdf6daea02904c86e0cc5e6c9f8f7' | Set-Content tested-revision.txt
+          Write-Host 'Testing PR revision 7932804ff8fbf0bb8af9c22453fc5c1a233d66d0'
+          '7932804ff8fbf0bb8af9c22453fc5c1a233d66d0' | Set-Content tested-revision.txt
       - name: Configure full project
         shell: cmd
         run: cmake . -A x64 -DCMAKE_BUILD_TYPE=Release
@@ -48,6 +48,8 @@ jobs:
             packages
           key: unregister-recovery-copilot-${{ github.sha }}
       - name: Run built WSL command
+        id: validation_1
+        continue-on-error: true
         shell: pwsh
         run: |
           $env:WSL_UTF8 = '1'
@@ -60,61 +62,107 @@ jobs:
           }
           exit 0
       - name: Run recovery store regression tests
+        id: validation_2
+        continue-on-error: true
         timeout-minutes: 6
         shell: cmd
         run: bin\x64\Release\test.bat /name:UnitTests::UnitTests::UnregisterRecoveryStore
       - name: Run recovery lifecycle regression tests
+        id: validation_3
+        continue-on-error: true
         timeout-minutes: 6
         shell: cmd
         run: bin\x64\Release\test.bat -Fast /name:UnitTests::UnitTests::UnregisterRecoveryLifecycle
       - name: Run pending recovery reservation and default regression tests
+        id: validation_4
+        continue-on-error: true
         timeout-minutes: 6
         shell: cmd
         run: bin\x64\Release\test.bat -Fast /name:UnitTests::UnitTests::UnregisterPendingRecovery
       - name: Run unregister compatibility regression tests
+        id: validation_5
+        continue-on-error: true
         timeout-minutes: 6
         shell: cmd
         run: bin\x64\Release\test.bat -Fast /name:UnitTests::UnitTests::UnregisterCompatibility
       - name: Run broken-distro unregister regression tests
+        id: validation_6
+        continue-on-error: true
         timeout-minutes: 6
         shell: cmd
         run: bin\x64\Release\test.bat -Fast /name:UnitTests::UnitTests::BrokenDistroUnregister
       - name: Recheck the original Copilot reproductions
+        id: validation_7
+        continue-on-error: true
         shell: pwsh
         run: .\.github\scripts\reproduce-unregister.ps1
       - name: Recheck restore journal and directory identity findings
+        id: validation_8
+        continue-on-error: true
         shell: pwsh
         run: .\.github\scripts\reproduce-recovery.ps1
       - name: Recheck unavailable-path and cleanup-retry findings
+        id: validation_9
+        continue-on-error: true
         timeout-minutes: 6
         shell: pwsh
         run: .\.github\scripts\reproduce-followup.ps1
       - name: Run distribution flavor and conversion compatibility tests
+        id: validation_10
+        continue-on-error: true
         timeout-minutes: 10
         shell: cmd
         run: bin\x64\Release\test.bat -Fast /name:UnitTests::UnitTests::VersionFlavorParsing
       - name: Run modern installation and cleanup compatibility tests
+        id: validation_11
+        continue-on-error: true
         timeout-minutes: 20
         shell: cmd
         run: bin\x64\Release\test.bat -Fast /name:UnitTests::UnitTests::ModernInstall
       - name: Run unregister regression tests with WSL 1
+        id: validation_12
+        continue-on-error: true
         shell: cmd
         run: bin\x64\Release\test.bat -Version 1 /name:UnitTests::UnitTests::*Unregister*
       - name: Run distribution flavor cleanup with WSL 1
+        id: validation_13
+        continue-on-error: true
         timeout-minutes: 10
         shell: cmd
         run: bin\x64\Release\test.bat -Fast -Version 1 /name:UnitTests::UnitTests::VersionFlavorParsing
       - name: Run CLI help regression test
+        id: validation_14
+        continue-on-error: true
         shell: cmd
         run: bin\x64\Release\test.bat -Fast /name:UnitTests::UnitTests::UsageMessages
       - name: Run import and registration compatibility tests
+        id: validation_15
+        continue-on-error: true
         shell: cmd
         run: bin\x64\Release\test.bat /name:UnitTests::UnitTests::ImportDistro
       - name: Run plugin registration and cleanup compatibility tests
+        id: validation_16
+        continue-on-error: true
         timeout-minutes: 6
         shell: cmd
         run: bin\x64\Release\test.bat -Fast /name:PluginTests::PluginTests::*Register*
       - name: Run plugin import-in-place cleanup compatibility test
+        id: validation_17
+        continue-on-error: true
         timeout-minutes: 6
         shell: cmd
         run: bin\x64\Release\test.bat -Fast /name:PluginTests::PluginTests::ImportInplaceSuccess
+      - name: Require every validation step to pass
+        if: always()
+        shell: pwsh
+        env:
+          VALIDATION_OUTCOMES: ${{ toJSON(steps) }}
+        run: |
+          $outcomes = $env:VALIDATION_OUTCOMES | ConvertFrom-Json -AsHashtable
+          if ($outcomes.Count -ne 17) { throw "Expected 17 validation steps, got $($outcomes.Count)" }
+          $failures = @()
+          foreach ($entry in $outcomes.GetEnumerator()) {
+            Write-Host "$($entry.Key): $($entry.Value.outcome)"
+            if ($entry.Value.outcome -ne 'success') { $failures += $entry.Key }
+          }
+          if ($failures.Count) { throw "Validation did not pass: $($failures -join ', ')" }
