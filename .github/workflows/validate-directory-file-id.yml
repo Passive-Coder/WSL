@@ -1,0 +1,67 @@
+name: Validate directory identity lookup
+on:
+  push:
+    branches: [fix/validate-directory-file-id]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: windows-2025
+    timeout-minutes: 5
+    steps:
+      - shell: pwsh
+        run: |
+          Add-Type -TypeDefinition @'
+          using System;
+          using System.Runtime.InteropServices;
+          using Microsoft.Win32.SafeHandles;
+          public class DirectoryIdentityProbe {
+              [StructLayout(LayoutKind.Sequential)]
+              public struct Identity { public ulong Volume; public ulong Low; public ulong High; }
+              [StructLayout(LayoutKind.Sequential)]
+              public struct Descriptor { public uint Size; public uint Type; public ulong Low; public ulong High; }
+              [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
+              public static extern SafeFileHandle CreateFileW(string path, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
+              [DllImport("kernel32.dll", SetLastError=true)]
+              public static extern bool GetFileInformationByHandleEx(SafeFileHandle handle, int type, out Identity info, uint size);
+              [DllImport("kernel32.dll", SetLastError=true)]
+              public static extern SafeFileHandle OpenFileById(SafeFileHandle hint, ref Descriptor id, uint access, uint share, IntPtr security, uint flags);
+              public static string Probe(SafeFileHandle anchor, Identity expected, uint type) {
+                  var id = new Descriptor { Size=24, Type=type, Low=expected.Low, High=expected.High };
+                  using (var handle = OpenFileById(anchor, ref id, 0x80, 7, IntPtr.Zero, 0x02200000)) {
+                      int error = Marshal.GetLastWin32Error();
+                      if (handle.IsInvalid) return "missing:" + error;
+                      Identity actual;
+                      if (!GetFileInformationByHandleEx(handle, 18, out actual, 24)) throw new System.ComponentModel.Win32Exception();
+                      if (actual.Volume != expected.Volume || actual.Low != expected.Low || actual.High != expected.High) throw new Exception("Identity mismatch");
+                      return "exists";
+                  }
+              }
+          }
+          '@
+          $root = Join-Path $env:TEMP ('wsl-file-id-' + [guid]::NewGuid())
+          $child = Join-Path $root 'child'
+          $renamed = Join-Path $root 'renamed'
+          New-Item -ItemType Directory -Path $child | Out-Null
+          $anchor = [DirectoryIdentityProbe]::CreateFileW($root, 0x81, 3, [IntPtr]::Zero, 3, 0x02200000, [IntPtr]::Zero)
+          $source = [DirectoryIdentityProbe]::CreateFileW($child, 0x80, 7, [IntPtr]::Zero, 3, 0x02200000, [IntPtr]::Zero)
+          if ($anchor.IsInvalid -or $source.IsInvalid) { throw 'Directory handle failed' }
+          $identity = New-Object DirectoryIdentityProbe+Identity
+          if (![DirectoryIdentityProbe]::GetFileInformationByHandleEx($source, 18, [ref]$identity, 24)) { throw 'Identity query failed' }
+          $source.Dispose()
+          try {
+            foreach ($type in @(2, 0)) {
+              Write-Host "existing type=${type}: $([DirectoryIdentityProbe]::Probe($anchor, $identity, $type))"
+            }
+            Move-Item $child $renamed
+            foreach ($type in @(2, 0)) {
+              Write-Host "renamed type=${type}: $([DirectoryIdentityProbe]::Probe($anchor, $identity, $type))"
+            }
+            Remove-Item $renamed
+            foreach ($type in @(2, 0)) {
+              Write-Host "deleted type=${type}: $([DirectoryIdentityProbe]::Probe($anchor, $identity, $type))"
+            }
+          } finally {
+            $anchor.Dispose()
+            Remove-Item $root -Recurse -Force
+          }
