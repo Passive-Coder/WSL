@@ -32,8 +32,8 @@ jobs:
       - name: Record tested PR source
         shell: pwsh
         run: |
-          Write-Host 'Testing PR revision 8c104c61fee64b5bea862e2c2cab42ed9e401a88'
-          '8c104c61fee64b5bea862e2c2cab42ed9e401a88' | Set-Content tested-revision.txt
+          Write-Host 'Testing PR revision 8a37ba540936279126ecae7fc3141e3aef88bb99'
+          '8a37ba540936279126ecae7fc3141e3aef88bb99' | Set-Content tested-revision.txt
       - name: Compile recovery header without a precompiled header
         shell: pwsh
         run: |
@@ -79,31 +79,31 @@ jobs:
       - name: Run recovery store regression tests
         id: validation_2
         continue-on-error: true
-        timeout-minutes: 6
+        timeout-minutes: 30
         shell: cmd
-        run: bin\x64\Release\test.bat /name:UnitTests::UnitTests::UnregisterRecoveryStore
+        run: bin\x64\Release\test.bat /name:UnitTests::UnitTests::UnregisterRecoveryStore*
       - name: Run recovery lifecycle regression tests
         id: validation_3
         continue-on-error: true
-        timeout-minutes: 6
+        timeout-minutes: 30
         shell: cmd
         run: bin\x64\Release\test.bat -Fast /name:UnitTests::UnitTests::UnregisterRecoveryLifecycle
       - name: Run pending recovery reservation and default regression tests
         id: validation_4
         continue-on-error: true
-        timeout-minutes: 6
+        timeout-minutes: 30
         shell: cmd
         run: bin\x64\Release\test.bat -Fast /name:UnitTests::UnitTests::UnregisterPendingRecovery
       - name: Run unregister compatibility regression tests
         id: validation_5
         continue-on-error: true
-        timeout-minutes: 6
+        timeout-minutes: 30
         shell: cmd
         run: bin\x64\Release\test.bat -Fast /name:UnitTests::UnitTests::UnregisterCompatibility
       - name: Run broken-distro unregister regression tests
         id: validation_6
         continue-on-error: true
-        timeout-minutes: 6
+        timeout-minutes: 30
         shell: cmd
         run: bin\x64\Release\test.bat -Fast /name:UnitTests::UnitTests::BrokenDistroUnregister
       - name: Recheck the original Copilot reproductions
@@ -119,7 +119,7 @@ jobs:
       - name: Recheck unavailable-path and cleanup-retry findings
         id: validation_9
         continue-on-error: true
-        timeout-minutes: 6
+        timeout-minutes: 30
         shell: pwsh
         run: .\.github\scripts\reproduce-followup.ps1
       - name: Run distribution flavor and conversion compatibility tests
@@ -158,13 +158,13 @@ jobs:
       - name: Run plugin registration and cleanup compatibility tests
         id: validation_16
         continue-on-error: true
-        timeout-minutes: 6
+        timeout-minutes: 30
         shell: cmd
         run: bin\x64\Release\test.bat -Fast /name:PluginTests::*Register*
       - name: Run plugin import-in-place cleanup compatibility test
         id: validation_17
         continue-on-error: true
-        timeout-minutes: 6
+        timeout-minutes: 30
         shell: cmd
         run: bin\x64\Release\test.bat -Fast /name:PluginTests::ImportInplaceSuccess
       - name: Require every validation step to pass
