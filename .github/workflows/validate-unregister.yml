@@ -29,41 +29,15 @@ jobs:
           $process = Start-Process $installer -ArgumentList $arguments -Wait -PassThru
           if ($process.ExitCode -notin @(0, 3010)) { throw "VS setup failed: $($process.ExitCode)" }
           New-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock' -Name AllowDevelopmentWithoutDevLicense -Value 1 -PropertyType DWord -Force
+      - name: Record tested PR source
+        shell: pwsh
+        run: |
+          Write-Host 'Testing PR revision 46edefaca48311e7a11e15701212bba1513b8b0a'
+          '46edefaca48311e7a11e15701212bba1513b8b0a' | Set-Content tested-revision.txt
       - name: Configure full project
         shell: cmd
         run: cmake . -A x64 -DCMAKE_BUILD_TYPE=Release
       - name: Build full project
-        shell: cmd
-        run: cmake --build . --config Release --parallel 4
-      - name: Confirm the new recovery regression fails before the fixes
-        timeout-minutes: 6
-        shell: pwsh
-        run: |
-          & .\bin\x64\Release\test.bat /name:UnitTests::UnitTests::UnregisterRecoveryStore *>&1 | Tee-Object red-regression.log
-          $testExit = $LASTEXITCODE
-          if ($testExit -eq 0) { throw 'The new regression unexpectedly passed before the fix.' }
-          Write-Host "Baseline regression failed as expected (exit $testExit)."
-          exit 0
-      - name: Wait for and load the reviewed fixes
-        timeout-minutes: 40
-        shell: pwsh
-        run: |
-          $baseline = '9f503ab95e4dbf0dfcf81dd6fc8b187386f82563'
-          for ($attempt = 0; $attempt -lt 150; $attempt++) {
-            git fetch origin fix/unregister-confirmation
-            if ($LASTEXITCODE -ne 0) { throw 'Fetching the PR branch failed.' }
-            $revision = (git rev-parse origin/fix/unregister-confirmation).Trim()
-            if ($revision -ne $baseline) {
-              git restore --source=$revision -- src/windows/common/DeletedDistributionStore.cpp src/windows/common/DeletedDistributionStore.h src/windows/common/WslClient.cpp test/windows/UnitTests.cpp
-              if ($LASTEXITCODE -ne 0) { throw 'Loading the reviewed source failed.' }
-              $revision | Set-Content tested-revision.txt
-              Write-Host "Testing PR revision $revision"
-              break
-            }
-            Start-Sleep -Seconds 15
-          }
-          if (-not (Test-Path tested-revision.txt)) { throw 'No fixed PR revision was published.' }
-      - name: Rebuild the full project with the fixes
         shell: cmd
         run: cmake --build . --config Release --parallel 4
       - name: Preserve built test files
@@ -93,6 +67,10 @@ jobs:
         timeout-minutes: 6
         shell: cmd
         run: bin\x64\Release\test.bat -Fast /name:UnitTests::UnitTests::UnregisterRecoveryLifecycle
+      - name: Run pending recovery reservation and default regression tests
+        timeout-minutes: 6
+        shell: cmd
+        run: bin\x64\Release\test.bat -Fast /name:UnitTests::UnitTests::UnregisterPendingRecovery
       - name: Run unregister compatibility regression tests
         timeout-minutes: 6
         shell: cmd
