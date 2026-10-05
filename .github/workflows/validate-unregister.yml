@@ -32,8 +32,8 @@ jobs:
       - name: Record tested PR source
         shell: pwsh
         run: |
-          Write-Host 'Testing PR revision b2243ec2194867cf201ac58d1f4e778794d8ae4b'
-          'b2243ec2194867cf201ac58d1f4e778794d8ae4b' | Set-Content tested-revision.txt
+          Write-Host 'Testing PR revision 25364cb9683a83c4ed3ba621d4a1d7ce34915894'
+          '25364cb9683a83c4ed3ba621d4a1d7ce34915894' | Set-Content tested-revision.txt
       - name: Configure full project
         shell: cmd
         run: cmake . -A x64 -DCMAKE_BUILD_TYPE=Release
@@ -89,6 +89,10 @@ jobs:
         timeout-minutes: 6
         shell: pwsh
         run: .\.github\scripts\reproduce-followup.ps1
+      - name: Run distribution flavor and conversion compatibility tests
+        timeout-minutes: 10
+        shell: cmd
+        run: bin\x64\Release\test.bat -Fast /name:UnitTests::UnitTests::VersionFlavorParsing
       - name: Run modern installation and cleanup compatibility tests
         timeout-minutes: 20
         shell: cmd
@@ -96,6 +100,10 @@ jobs:
       - name: Run unregister regression tests with WSL 1
         shell: cmd
         run: bin\x64\Release\test.bat -Version 1 /name:UnitTests::UnitTests::*Unregister*
+      - name: Run distribution flavor cleanup with WSL 1
+        timeout-minutes: 10
+        shell: cmd
+        run: bin\x64\Release\test.bat -Fast -Version 1 /name:UnitTests::UnitTests::VersionFlavorParsing
       - name: Run CLI help regression test
         shell: cmd
         run: bin\x64\Release\test.bat -Fast /name:UnitTests::UnitTests::UsageMessages
