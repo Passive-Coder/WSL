@@ -32,8 +32,8 @@ jobs:
       - name: Record tested PR source
         shell: pwsh
         run: |
-          Write-Host 'Testing PR revision 1d0f12215cba01fa28f61af21cef1e2df809cc04'
-          '1d0f12215cba01fa28f61af21cef1e2df809cc04' | Set-Content tested-revision.txt
+          Write-Host 'Testing PR revision a07508f57657151d730ba2b0ab4fbaab0c2628de'
+          'a07508f57657151d730ba2b0ab4fbaab0c2628de' | Set-Content tested-revision.txt
       - name: Configure full project
         shell: cmd
         run: cmake . -A x64 -DCMAKE_BUILD_TYPE=Release
@@ -145,13 +145,13 @@ jobs:
         continue-on-error: true
         timeout-minutes: 6
         shell: cmd
-        run: bin\x64\Release\test.bat -Fast /name:PluginTests::PluginTests::*Register*
+        run: bin\x64\Release\test.bat -Fast /name:PluginTests::*Register*
       - name: Run plugin import-in-place cleanup compatibility test
         id: validation_17
         continue-on-error: true
         timeout-minutes: 6
         shell: cmd
-        run: bin\x64\Release\test.bat -Fast /name:PluginTests::PluginTests::ImportInplaceSuccess
+        run: bin\x64\Release\test.bat -Fast /name:PluginTests::ImportInplaceSuccess
       - name: Require every validation step to pass
         if: always()
         shell: pwsh
