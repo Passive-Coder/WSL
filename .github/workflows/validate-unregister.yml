@@ -32,8 +32,23 @@ jobs:
       - name: Record tested PR source
         shell: pwsh
         run: |
-          Write-Host 'Testing PR revision 30a302003bb9b47278a08bbe298a8fa197fd6ca1'
-          '30a302003bb9b47278a08bbe298a8fa197fd6ca1' | Set-Content tested-revision.txt
+          Write-Host 'Testing PR revision 8c104c61fee64b5bea862e2c2cab42ed9e401a88'
+          '8c104c61fee64b5bea862e2c2cab42ed9e401a88' | Set-Content tested-revision.txt
+      - name: Compile recovery header without a precompiled header
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vsInstallation = & $vswhere -latest -products * -property installationPath
+          $compilerEnvironment = Join-Path $vsInstallation 'VC\Auxiliary\Build\vcvars64.bat'
+          '#include "src/windows/common/DeletedDistributionStore.h"' | Set-Content deleted-store-header.cpp
+          @"
+          @echo off
+          call "$compilerEnvironment"
+          if errorlevel 1 exit /b %errorlevel%
+          cl /nologo /std:c++20 /EHsc /c /I. /Fodeleted-store-header.obj deleted-store-header.cpp
+          "@ | Set-Content compile-recovery-header.cmd
+          & cmd.exe /d /c .\compile-recovery-header.cmd
+          if ($LASTEXITCODE -ne 0) { throw "Standalone recovery header compilation failed: $LASTEXITCODE" }
       - name: Configure full project
         shell: cmd
         run: cmake . -A x64 -DCMAKE_BUILD_TYPE=Release
