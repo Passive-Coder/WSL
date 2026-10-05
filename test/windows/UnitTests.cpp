@@ -1094,7 +1094,7 @@ class UnitTests
             WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::None}));
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode | grep -iF 'none'"), 0u);
 
-            if (AreExperimentalNetworkingFeaturesSupported() && IsHyperVFirewallSupported())
+            if (IsMirroredNetworkingSupported())
             {
                 config.Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
                 VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode | grep -iF 'mirrored'"), 0u);
@@ -7843,6 +7843,18 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             VERIFY_IS_FALSE(std::filesystem::exists(entry.Path.parent_path()));
             VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
         }
+        // Cleanup can finish after the recovery directory was deleted but before its tombstone was removed.
+        {
+            const auto [id, path] = create();
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+            const auto entry = entryFor(id);
+            const auto deleted = registry::OpenKey(key.get(), (L"Deleted-" + keyName(id)).c_str(), KEY_READ | KEY_WRITE);
+            registry::WriteDword(deleted.get(), nullptr, L"RecoveryCleanupPending", 1);
+            std::filesystem::remove(entry.Path);
+            std::filesystem::remove(entry.Path.parent_path());
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
+        }
         // A failed reverse move leaves the journal intact; startup can finish the forward move.
         for (const bool failRollback : {false, true})
         {
@@ -7930,6 +7942,40 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             VERIFY_IS_FALSE(registry::ReadOptionalString(restored.get(), nullptr, L"RecoveryPath").has_value());
             Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
             VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
+        }
+        // Recovery resumes a restore that crashed after changing only part of the registration.
+        {
+            const auto [id, path] = create();
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+            const auto entry = entryFor(id);
+            const auto deleted = registry::OpenKey(key.get(), (L"Deleted-" + keyName(id)).c_str(), KEY_READ | KEY_WRITE);
+            registry::WriteString(deleted.get(), nullptr, L"RecoveryRestoreName", L"interrupted-restore");
+            registry::WriteDword(deleted.get(), nullptr, L"RecoveryRestorePending", 1);
+            registry::WriteString(deleted.get(), nullptr, L"DistributionName", L"partially-written-name");
+            Store::RecoverPending(key.get());
+            VERIFY_IS_TRUE(isActive(id));
+            VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
+            const auto restored = registry::OpenKey(key.get(), keyName(id).c_str(), KEY_READ);
+            VERIFY_ARE_EQUAL(registry::ReadString(restored.get(), nullptr, L"DistributionName"), L"interrupted-restore");
+            VERIFY_ARE_EQUAL(registry::ReadString(restored.get(), nullptr, L"BasePath"), entry.Path.parent_path().wstring());
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
+        }
+        // A pending restore remains protected from expiry even if recovery cannot complete it.
+        {
+            const auto [id, path] = create();
+            VERIFY_IS_TRUE(Store::Retain(key.get(), id, path));
+            const auto entry = entryFor(id);
+            const auto deletedName = L"Deleted-" + keyName(id);
+            const auto deleted = registry::OpenKey(key.get(), deletedName.c_str(), KEY_READ | KEY_WRITE);
+            registry::WriteDword(deleted.get(), nullptr, L"RecoveryRestorePending", 1);
+            Store::RecoverPending(key.get());
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_ARE_EQUAL(contents(entry.Path), "original disk contents");
+            VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 1u);
+            registry::DeleteValue(deleted.get(), L"RecoveryRestorePending");
+            Store::Cleanup(key.get(), entry.DeletedAt + Store::Retention);
+            VERIFY_ARE_EQUAL(Store::Enumerate(key.get()).size(), 0u);
         }
         // Startup finishes the journal after a move, before the registration rename committed.
         {
@@ -8092,6 +8138,10 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         VERIFY_IS_FALSE(std::filesystem::exists(install / LXSS_ROOTFS_DIRECTORY));
         VERIFY_IS_FALSE(std::filesystem::exists(install / LXSS_TEMP_DIRECTORY));
         VERIFY_IS_FALSE(std::filesystem::exists(install / LXSS_PLAN9_UNIX_SOCKET));
+        const auto [ordinaryList, ordinaryListErr] = LxsstuLaunchWslAndCaptureOutput(L"--list --all");
+        VERIFY_IS_TRUE(ordinaryList.find(name) == std::wstring::npos);
+        VERIFY_IS_TRUE(ordinaryList.find(originalKey) == std::wstring::npos);
+        VERIFY_ARE_EQUAL(ordinaryListErr, L"");
         VERIFY_ARE_EQUAL(
             LxsstuLaunchWsl(std::format(L"--import {} \"{}\" \"{}\" --version 1", name, install.wstring(), archive.wstring())), 0u);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--unregister {} --force", name)), 0u);
