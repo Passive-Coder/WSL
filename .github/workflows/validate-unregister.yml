@@ -32,8 +32,8 @@ jobs:
       - name: Record tested PR source
         shell: pwsh
         run: |
-          Write-Host 'Testing PR revision 4c1a4a9e5a4de1948874d4505bd4151e7385d1e5'
-          '4c1a4a9e5a4de1948874d4505bd4151e7385d1e5' | Set-Content tested-revision.txt
+          Write-Host 'Testing PR revision d0d28803e5070c7f1485718b16e9b0233486f03e'
+          'd0d28803e5070c7f1485718b16e9b0233486f03e' | Set-Content tested-revision.txt
       - name: Configure full project
         shell: cmd
         run: cmake . -A x64 -DCMAKE_BUILD_TYPE=Release
@@ -89,6 +89,10 @@ jobs:
         timeout-minutes: 6
         shell: pwsh
         run: .\.github\scripts\reproduce-followup.ps1
+      - name: Run modern installation and cleanup compatibility tests
+        timeout-minutes: 20
+        shell: cmd
+        run: bin\x64\Release\test.bat -Fast /name:UnitTests::UnitTests::ModernInstall
       - name: Run unregister regression tests with WSL 1
         shell: cmd
         run: bin\x64\Release\test.bat -Version 1 /name:UnitTests::UnitTests::*Unregister*
