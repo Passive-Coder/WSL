@@ -32,8 +32,8 @@ jobs:
       - name: Record tested PR source
         shell: pwsh
         run: |
-          Write-Host 'Testing PR revision bf001933316925a472de0525800d683b68780573'
-          'bf001933316925a472de0525800d683b68780573' | Set-Content tested-revision.txt
+          Write-Host 'Testing PR revision 2becb96ffd4bdf6daea02904c86e0cc5e6c9f8f7'
+          '2becb96ffd4bdf6daea02904c86e0cc5e6c9f8f7' | Set-Content tested-revision.txt
       - name: Configure full project
         shell: cmd
         run: cmake . -A x64 -DCMAKE_BUILD_TYPE=Release
