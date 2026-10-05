@@ -7,7 +7,7 @@ permissions:
 jobs:
   build-and-test:
     runs-on: windows-2025
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
         with:
@@ -35,13 +35,44 @@ jobs:
       - name: Build full project
         shell: cmd
         run: cmake --build . --config Release --parallel 4
+      - name: Confirm the new recovery regression fails before the fixes
+        timeout-minutes: 6
+        shell: pwsh
+        run: |
+          & .\bin\x64\Release\test.bat /name:UnitTests::UnitTests::UnregisterRecoveryStore *>&1 | Tee-Object red-regression.log
+          $testExit = $LASTEXITCODE
+          if ($testExit -eq 0) { throw 'The new regression unexpectedly passed before the fix.' }
+          Write-Host "Baseline regression failed as expected (exit $testExit)."
+          exit 0
+      - name: Wait for and load the reviewed fixes
+        timeout-minutes: 40
+        shell: pwsh
+        run: |
+          $baseline = '9f503ab95e4dbf0dfcf81dd6fc8b187386f82563'
+          for ($attempt = 0; $attempt -lt 150; $attempt++) {
+            git fetch origin fix/unregister-confirmation
+            if ($LASTEXITCODE -ne 0) { throw 'Fetching the PR branch failed.' }
+            $revision = (git rev-parse origin/fix/unregister-confirmation).Trim()
+            if ($revision -ne $baseline) {
+              git restore --source=$revision -- src/windows/common/DeletedDistributionStore.cpp src/windows/common/DeletedDistributionStore.h src/windows/common/WslClient.cpp test/windows/UnitTests.cpp
+              if ($LASTEXITCODE -ne 0) { throw 'Loading the reviewed source failed.' }
+              $revision | Set-Content tested-revision.txt
+              Write-Host "Testing PR revision $revision"
+              break
+            }
+            Start-Sleep -Seconds 15
+          }
+          if (-not (Test-Path tested-revision.txt)) { throw 'No fixed PR revision was published.' }
+      - name: Rebuild the full project with the fixes
+        shell: cmd
+        run: cmake --build . --config Release --parallel 4
       - name: Preserve built test files
         uses: actions/cache/save@v4
         with:
           path: |
             bin/x64/Release
             packages
-          key: unregister-recovery-followup-8dc33695
+          key: unregister-recovery-copilot-${{ github.sha }}
       - name: Run built WSL command
         shell: pwsh
         run: |
